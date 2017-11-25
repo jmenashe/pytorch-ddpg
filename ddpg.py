@@ -55,9 +55,10 @@ class DDPG(object):
         self.s_t = None # Most recent state
         self.a_t = None # Most recent action
         self.is_training = True
+        self.use_cuda = args.cuda and torch.cuda.is_available()
 
         # 
-        if USE_CUDA: self.cuda()
+        if self.use_cuda: self.cuda()
 
     def update_policy(self):
         # Sample batch
@@ -66,18 +67,18 @@ class DDPG(object):
 
         # Prepare for the target q batch
         next_q_values = self.critic_target([
-            to_tensor(next_state_batch, volatile=True),
-            self.actor_target(to_tensor(next_state_batch, volatile=True)),
+            to_tensor(next_state_batch, volatile=True, use_cuda=self.use_cuda),
+            self.actor_target(to_tensor(next_state_batch, volatile=True, use_cuda=self.use_cuda)),
         ])
         next_q_values.volatile=False
 
-        target_q_batch = to_tensor(reward_batch) + \
-            self.discount*to_tensor(terminal_batch.astype(np.float))*next_q_values
+        target_q_batch = to_tensor(reward_batch, use_cuda=self.use_cuda) + \
+            self.discount*to_tensor(terminal_batch.astype(np.float), use_cuda=self.use_cuda)*next_q_values
 
         # Critic update
         self.critic.zero_grad()
 
-        q_batch = self.critic([ to_tensor(state_batch), to_tensor(action_batch) ])
+        q_batch = self.critic([ to_tensor(state_batch, use_cuda=self.use_cuda), to_tensor(action_batch, use_cuda=self.use_cuda) ])
         
         value_loss = criterion(q_batch, target_q_batch)
         value_loss.backward()
@@ -87,8 +88,8 @@ class DDPG(object):
         self.actor.zero_grad()
 
         policy_loss = -self.critic([
-            to_tensor(state_batch),
-            self.actor(to_tensor(state_batch))
+            to_tensor(state_batch, use_cuda=self.use_cuda),
+            self.actor(to_tensor(state_batch, use_cuda=self.use_cuda))
         ])
 
         policy_loss = policy_loss.mean()
@@ -123,7 +124,8 @@ class DDPG(object):
 
     def select_action(self, s_t, decay_epsilon=True):
         action = to_numpy(
-            self.actor(to_tensor(np.array([s_t])))
+            self.actor(to_tensor(np.array([s_t]), use_cuda=self.use_cuda)),
+            self.use_cuda
         ).squeeze(0)
         action += self.is_training*max(self.epsilon, 0)*self.random_process.sample()
         action = np.clip(action, -1., 1.)
@@ -162,5 +164,5 @@ class DDPG(object):
 
     def seed(self,s):
         torch.manual_seed(s)
-        if USE_CUDA:
+        if self.use_cuda:
             torch.cuda.manual_seed(s)

@@ -33,6 +33,8 @@ def train(num_iterations, gent, env,  evaluate, validate_steps, output, max_epis
         
         # env response with next_observation, reward, terminate_info
         observation2, reward, done, info = env.step(action)
+        if args.render:
+          env.render()
         observation2 = deepcopy(observation2)
         if max_episode_length and episode_steps >= max_episode_length -1:
             done = True
@@ -114,8 +116,9 @@ if __name__ == "__main__":
     parser.add_argument('--epsilon', default=50000, type=int, help='linear decay of exploration policy')
     parser.add_argument('--seed', default=-1, type=int, help='')
     parser.add_argument('--resume', default='default', type=str, help='Resuming model path for testing')
+    parser.add_argument('--render', dest='render', action='store_true')
     # parser.add_argument('--l2norm', default=0.01, type=float, help='l2 weight decay') # TODO
-    # parser.add_argument('--cuda', dest='cuda', action='store_true') # TODO
+    parser.add_argument('--cuda', dest='cuda', action='store_true')
 
     args = parser.parse_args()
     args.output = get_output_folder(args.output, args.env)
